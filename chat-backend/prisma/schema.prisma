@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  picture       String?
+  googleId      String?   @unique
+  password      String?
+  isOnline      Boolean   @default(false)
+  lastSeen      DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sentMessages      Message[]       @relation("SentMessages")
+  receivedMessages  Message[]       @relation("ReceivedMessages")
+  conversations1    Conversation[]  @relation("User1Conversations")
+  conversations2    Conversation[]  @relation("User2Conversations")
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  user1Id       String
+  user2Id       String
+  isArchived1   Boolean   @default(false)
+  isArchived2   Boolean   @default(false)
+  isMuted1      Boolean   @default(false)
+  isMuted2      Boolean   @default(false)
+  unreadCount1  Int       @default(0)
+  unreadCount2  Int       @default(0)
+  lastMessageAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user1         User      @relation("User1Conversations", fields: [user1Id], references: [id])
+  user2         User      @relation("User2Conversations", fields: [user2Id], references: [id])
+  messages      Message[]
+
+  @@unique([user1Id, user2Id])
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  content         String
+  senderId        String
+  receiverId      String
+  conversationId  String
+  isRead          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sender        User          @relation("SentMessages", fields: [senderId], references: [id])
+  receiver      User          @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  conversation  Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
