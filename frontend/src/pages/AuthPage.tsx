@@ -72,7 +72,11 @@ export default function AuthPage() {
     setSuccess(null)
     try {
       await googleLogin(credentialResponse.credential)
-      setSuccess('Logged in with Google')
+      setSuccess('Logged in with Google successfully!')
+      // Small delay to show success message before navigation
+      setTimeout(() => {
+        setIsLoading(false)
+      }, 300)
       // Navigation will happen automatically via useEffect when token is set
     } catch (err: any) {
       let msg = 'Google login failed. Please try again.'
@@ -159,8 +163,16 @@ export default function AuthPage() {
               <p>{isLogin ? 'Sign in to continue chatting' : 'Join thousands of users. Free forever.'}</p>
             </div>
 
-              {error ? <div className="alert error">{error}</div> : null}
-              {success ? <div className="alert success">{success}</div> : null}
+              {error ? (
+                <div className="alert error" role="alert" style={{ animation: 'fadeIn 0.3s ease-in' }}>
+                  {error}
+                </div>
+              ) : null}
+              {success ? (
+                <div className="alert success" role="alert" style={{ animation: 'fadeIn 0.3s ease-in' }}>
+                  {success}
+                </div>
+              ) : null}
 
             <div className="google-auth">
               {canUseGoogle ? (

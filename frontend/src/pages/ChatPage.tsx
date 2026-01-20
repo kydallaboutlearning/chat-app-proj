@@ -21,6 +21,8 @@ export default function ChatPage() {
   const conversations = useChatStore((s) => s.conversations)
   const currentConversationId = useChatStore((s) => s.currentConversationId)
   const messagesByConv = useChatStore((s) => s.messages)
+  const isLoading = useChatStore((s) => s.isLoading)
+  const chatError = useChatStore((s) => s.error)
 
   const fetchUsers = useChatStore((s) => s.fetchUsers)
   const fetchConversations = useChatStore((s) => s.fetchConversations)
@@ -187,7 +189,7 @@ export default function ChatPage() {
     const el = chatMessagesRef.current
     if (!el) return
     el.scrollTop = el.scrollHeight
-  }, [messages.length])
+  }, [groupedMessages.length])
 
   // Swipe handlers (ported from `app.js`)
   useEffect(() => {
@@ -310,6 +312,33 @@ export default function ChatPage() {
           <p>Session expired or invalid. Please log in again.</p>
           <button className="submit-btn" type="button" onClick={handleLogout}>
             Go to login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state while initial data is being fetched
+  if (isLoading && conversations.length === 0 && users.length === 0) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ marginBottom: '16px', fontSize: '18px' }}>Loading...</div>
+          <div style={{ color: '#6b7280', fontSize: '14px' }}>Fetching your conversations</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error if there's a chat error
+  if (chatError && conversations.length === 0) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center', maxWidth: '400px', padding: '20px' }}>
+          <div style={{ color: '#b91c1c', marginBottom: '16px', fontSize: '16px' }}>⚠️ Error loading chat</div>
+          <div style={{ color: '#6b7280', marginBottom: '20px', fontSize: '14px' }}>{chatError}</div>
+          <button className="submit-btn" type="button" onClick={() => window.location.reload()}>
+            Reload Page
           </button>
         </div>
       </div>
