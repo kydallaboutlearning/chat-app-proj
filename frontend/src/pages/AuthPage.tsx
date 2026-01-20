@@ -54,8 +54,10 @@ export default function AuthPage() {
         msg = err.response.data.error
       } else if (err?.message) {
         msg = err.message
-      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK') {
-        msg = 'Network error. Please check if the server is running.'
+      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK' || err?.code === 'ERR_CONNECTION_REFUSED') {
+        msg = '⚠️ Backend server is not running! Please start the backend server first. See SETUP_GUIDE.md for instructions.'
+      } else if (!err?.response) {
+        msg = '⚠️ Cannot connect to backend server. Make sure the backend is running on http://localhost:3001'
       }
       setError(msg)
       setIsLoading(false)
@@ -78,8 +80,10 @@ export default function AuthPage() {
         msg = err.response.data.error
       } else if (err?.message) {
         msg = err.message
-      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK') {
-        msg = 'Network error. Please check if the server is running.'
+      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK' || err?.code === 'ERR_CONNECTION_REFUSED') {
+        msg = '⚠️ Backend server is not running! Please start the backend server first. See SETUP_GUIDE.md for instructions.'
+      } else if (!err?.response) {
+        msg = '⚠️ Cannot connect to backend server. Make sure the backend is running on http://localhost:3001'
       }
       setError(msg)
       setIsLoading(false)
