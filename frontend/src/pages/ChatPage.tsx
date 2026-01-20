@@ -15,6 +15,7 @@ const CONTEXT_MENU_ESTIMATED_HEIGHT = 260
 export default function ChatPage() {
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
+  const checkAuth = useAuthStore((s) => s.checkAuth)
   const logout = useAuthStore((s) => s.logout)
   const users = useChatStore((s) => s.users)
   const conversations = useChatStore((s) => s.conversations)
@@ -109,9 +110,13 @@ export default function ChatPage() {
 
   // Fetch data on mount
   useEffect(() => {
+    if (!currentUser) {
+      checkAuth().catch(() => handleLogout())
+      return
+    }
     fetchUsers()
     fetchConversations()
-  }, [fetchUsers, fetchConversations])
+  }, [fetchUsers, fetchConversations, currentUser, checkAuth])
 
   // Socket.io real-time updates
   useEffect(() => {
@@ -295,6 +300,20 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Failed to send message:', error)
     }
+  }
+
+  // If auth is missing, show a friendly fallback instead of a blank screen
+  if (!currentUser) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p>Session expired or invalid. Please log in again.</p>
+          <button className="submit-btn" type="button" onClick={handleLogout}>
+            Go to login
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const appContainerClass = clsx('app-container', isContactInfoOpen && 'contact-open')

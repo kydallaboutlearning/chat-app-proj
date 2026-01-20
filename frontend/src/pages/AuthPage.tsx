@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { useNavigate } from 'react-router-dom'
 
@@ -12,6 +12,8 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
   const canUseGoogle = Boolean(googleClientId)
@@ -19,28 +21,70 @@ export default function AuthPage() {
   const login = useAuthStore((s) => s.login)
   const register = useAuthStore((s) => s.register)
   const googleLogin = useAuthStore((s) => s.googleLogin)
+  const token = useAuthStore((s) => s.token)
+  const isCheckingAuth = useAuthStore((s) => s.isCheckingAuth)
 
   const navigate = useNavigate()
+
+  // Navigate to chat when token is available and auth check is complete
+  useEffect(() => {
+    if (token && !isCheckingAuth) {
+      setIsLoading(false)
+      navigate('/chat')
+    }
+  }, [token, isCheckingAuth, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
+    setSuccess(null)
     try {
       if (isLogin) {
         await login(email, password)
+        setSuccess('Logged in successfully')
       } else {
         await register(email, password, name)
+        setSuccess('Account created successfully')
       }
-      navigate('/chat')
-    } finally {
+      // Navigation will happen automatically via useEffect when token is set
+    } catch (err: any) {
+      let msg = 'Something went wrong. Please try again.'
+      if (err?.response?.data?.error) {
+        msg = err.response.data.error
+      } else if (err?.message) {
+        msg = err.message
+      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK') {
+        msg = 'Network error. Please check if the server is running.'
+      }
+      setError(msg)
       setIsLoading(false)
+      console.error('Login error:', err)
     }
   }
 
   const handleGoogleSuccess = async (credentialResponse: any) => {
     if (!credentialResponse?.credential) return
-    await googleLogin(credentialResponse.credential)
-    navigate('/chat')
+    setIsLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await googleLogin(credentialResponse.credential)
+      setSuccess('Logged in with Google')
+      // Navigation will happen automatically via useEffect when token is set
+    } catch (err: any) {
+      let msg = 'Google login failed. Please try again.'
+      if (err?.response?.data?.error) {
+        msg = err.response.data.error
+      } else if (err?.message) {
+        msg = err.message
+      } else if (err?.code === 'ECONNABORTED' || err?.code === 'ERR_NETWORK') {
+        msg = 'Network error. Please check if the server is running.'
+      }
+      setError(msg)
+      setIsLoading(false)
+      console.error('Google login error:', err)
+    }
   }
 
   return (
@@ -49,31 +93,56 @@ export default function AuthPage() {
         <div className="auth-branding">
           <div className="brand-content">
             <div className="logo">
-              <img src="/vite.svg" alt="Chat App" />
-              <span>Chat App</span>
+              <div className="logo-icon">💬</div>
+              <span>Message</span>
             </div>
 
-            <h1>Connect instantly with anyone, anywhere</h1>
-            <p>Real-time messaging with a clean, modern UI.</p>
+            <h1>Stay connected with instant messaging</h1>
+            <p className="subtitle">Join thousands of users enjoying seamless, real-time conversations. Get started in seconds.</p>
 
             <div className="social-proof">
-              <p>
-                <strong>10,000+</strong> active users
-              </p>
+              <div className="proof-item">
+                <strong>10,000+</strong>
+                <span>Active users</span>
+              </div>
+              <div className="proof-item">
+                <strong>99.9%</strong>
+                <span>Uptime</span>
+              </div>
+              <div className="proof-item">
+                <strong>24/7</strong>
+                <span>Support</span>
+              </div>
             </div>
 
             <div className="features">
               <div className="feature">
-                <span className="icon">⚡</span>
-                <span>Real-time messaging</span>
+                <div className="feature-icon">⚡</div>
+                <div className="feature-text">
+                  <strong>Lightning fast</strong>
+                  <span>Messages delivered instantly</span>
+                </div>
               </div>
               <div className="feature">
-                <span className="icon">🔒</span>
-                <span>Secure by design</span>
+                <div className="feature-icon">🔒</div>
+                <div className="feature-text">
+                  <strong>End-to-end secure</strong>
+                  <span>Your conversations are private</span>
+                </div>
               </div>
               <div className="feature">
-                <span className="icon">🧠</span>
-                <span>Ready for AI upgrades</span>
+                <div className="feature-icon">🌐</div>
+                <div className="feature-text">
+                  <strong>Works everywhere</strong>
+                  <span>Desktop, mobile, anywhere</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonials">
+              <div className="testimonial">
+                <div className="testimonial-content">"Best chat app I've used. Clean interface and super fast!"</div>
+                <div className="testimonial-author">— Sarah M., Product Manager</div>
               </div>
             </div>
           </div>
@@ -82,9 +151,12 @@ export default function AuthPage() {
         <div className="auth-form-section">
           <div className="auth-form-container">
             <div className="form-header">
-              <h2>{isLogin ? 'Welcome back' : 'Create account'}</h2>
-              <p>{isLogin ? 'Sign in to continue' : 'Get started in under a minute'}</p>
+              <h2>{isLogin ? 'Welcome back!' : 'Create your account'}</h2>
+              <p>{isLogin ? 'Sign in to continue chatting' : 'Join thousands of users. Free forever.'}</p>
             </div>
+
+              {error ? <div className="alert error">{error}</div> : null}
+              {success ? <div className="alert success">{success}</div> : null}
 
             <div className="google-auth">
               {canUseGoogle ? (
@@ -149,6 +221,11 @@ export default function AuthPage() {
               <button type="submit" className="submit-btn" disabled={isLoading}>
                 {isLoading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
               </button>
+              {isLoading && (
+                <div style={{ marginTop: '10px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>
+                  Please wait...
+                </div>
+              )}
             </form>
 
             <div className="auth-switch">
