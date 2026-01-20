@@ -25,7 +25,11 @@ dist-ssr
 
 node_modules
 # Keep environment variables out of version control
-*.env
+# Ignore all .env files in any folder
+**/.env
+**/.env.*
+.env
+.env.*
 
 /src/generated/prisma
 
