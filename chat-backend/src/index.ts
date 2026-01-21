@@ -721,8 +721,8 @@ export default app
 async function shutdown(signal: string) {
   console.log(`Received ${signal}, shutting down...`)
   try {
-    io.close()
-    httpServer.close()
+    io?.close()           // Use optional chaining
+    httpServer?.close()   // Use optional chaining
     await prisma.$disconnect()
   } finally {
     process.exit(0)

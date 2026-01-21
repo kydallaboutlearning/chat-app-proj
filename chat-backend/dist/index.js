@@ -30,13 +30,19 @@ const adapter = new PrismaPg({ connectionString: databaseUrl });
 const prisma = new PrismaClientCtor({ adapter });
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID || undefined);
 const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-        origin: env.CLIENT_URL,
-        methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    },
-});
+// Only create HTTP server and Socket.io if not in Vercel serverless environment
+const isVercel = process.env.VERCEL === '1';
+let httpServer = null;
+let io = null;
+if (!isVercel) {
+    httpServer = createServer(app);
+    io = new Server(httpServer, {
+        cors: {
+            origin: env.CLIENT_URL,
+            methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+        },
+    });
+}
 app.use(cors({ origin: env.CLIENT_URL }));
 app.use(express.json());
 app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -468,7 +474,9 @@ app.post('/api/conversations/:conversationId/messages', authenticate, async (req
                 [isUser1Receiver ? 'unreadCount1' : 'unreadCount2']: { increment: 1 },
             },
         });
-        io.to(`user:${receiverId}`).emit('message:new', message);
+        if (io) {
+            io.to(`user:${receiverId}`).emit('message:new', message);
+        }
         res.status(201).json({ success: true, message });
     }
     catch (error) {
@@ -477,151 +485,166 @@ app.post('/api/conversations/:conversationId/messages', authenticate, async (req
     }
 });
 // ==================== WEBSOCKET ====================
+// Note: Socket.io requires persistent connections and won't work on Vercel serverless
+// For production, deploy Socket.io server separately (Railway/Render recommended)
 const socketIdToUserId = new Map();
 const userIdToSocketIds = new Map();
-io.use(async (socket, next) => {
-    const token = socket.handshake.auth?.token;
-    if (!token)
-        return next(new Error('Authentication required'));
-    const decoded = verifyToken(token);
-    if (!decoded)
-        return next(new Error('Invalid token'));
-    const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: { id: true, name: true, email: true, picture: true },
-    });
-    if (!user)
-        return next(new Error('User not found'));
-    socket.data.user = user;
-    next();
-});
-io.on('connection', async (socket) => {
-    const user = socket.data.user;
-    socketIdToUserId.set(socket.id, user.id);
-    const setForUser = userIdToSocketIds.get(user.id) ?? new Set();
-    setForUser.add(socket.id);
-    userIdToSocketIds.set(user.id, setForUser);
-    socket.join(`user:${user.id}`);
-    // First connection -> mark online
-    if (setForUser.size === 1) {
-        await prisma.user.update({ where: { id: user.id }, data: { isOnline: true } });
-        socket.broadcast.emit('user:online', { userId: user.id, isOnline: true });
-    }
-    socket.on('message:send', async (data) => {
-        const schema = z.object({
-            conversationId: z.string().min(1),
-            content: z.string().min(1).max(5000),
+if (io) {
+    io.use(async (socket, next) => {
+        const token = socket.handshake.auth?.token;
+        if (!token)
+            return next(new Error('Authentication required'));
+        const decoded = verifyToken(token);
+        if (!decoded)
+            return next(new Error('Invalid token'));
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.userId },
+            select: { id: true, name: true, email: true, picture: true },
         });
-        const parsed = schema.safeParse(data);
-        if (!parsed.success)
-            return socket.emit('message:error', { error: zodErrorToMessage(parsed.error) });
-        try {
-            const { conversationId, content } = parsed.data;
-            const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-            if (!conversation)
-                return;
-            if (conversation.user1Id !== user.id && conversation.user2Id !== user.id)
-                return;
-            const receiverId = conversation.user1Id === user.id ? conversation.user2Id : conversation.user1Id;
-            const message = await prisma.message.create({
-                data: { content, senderId: user.id, receiverId, conversationId },
-            });
-            const isUser1Receiver = conversation.user1Id === receiverId;
-            await prisma.conversation.update({
-                where: { id: conversationId },
-                data: {
-                    lastMessageAt: new Date(),
-                    [isUser1Receiver ? 'unreadCount1' : 'unreadCount2']: { increment: 1 },
-                },
-            });
-            io.to(`user:${receiverId}`).emit('message:new', message);
-            socket.emit('message:sent', message);
-        }
-        catch (error) {
-            console.error('Error sending message:', error);
-            socket.emit('message:error', { error: 'Failed to send message' });
-        }
+        if (!user)
+            return next(new Error('User not found'));
+        socket.data.user = user;
+        next();
     });
-    socket.on('message:read', async (data) => {
-        const schema = z.object({ conversationId: z.string().min(1) });
-        const parsed = schema.safeParse(data);
-        if (!parsed.success)
-            return;
-        try {
-            const { conversationId } = parsed.data;
-            const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-            if (!conversation)
-                return;
-            if (conversation.user1Id !== user.id && conversation.user2Id !== user.id)
-                return;
-            await prisma.message.updateMany({
-                where: { conversationId, receiverId: user.id, isRead: false },
-                data: { isRead: true },
-            });
-            const isUser1 = conversation.user1Id === user.id;
-            await prisma.conversation.update({
-                where: { id: conversationId },
-                data: { [isUser1 ? 'unreadCount1' : 'unreadCount2']: 0 },
-            });
-            const otherUserId = isUser1 ? conversation.user2Id : conversation.user1Id;
-            io.to(`user:${otherUserId}`).emit('message:read', {
-                conversationId,
-                readBy: user.id,
-                readAt: new Date(),
-            });
+    io.on('connection', async (socket) => {
+        const user = socket.data.user;
+        socketIdToUserId.set(socket.id, user.id);
+        const setForUser = userIdToSocketIds.get(user.id) ?? new Set();
+        setForUser.add(socket.id);
+        userIdToSocketIds.set(user.id, setForUser);
+        socket.join(`user:${user.id}`);
+        // First connection -> mark online
+        if (setForUser.size === 1) {
+            await prisma.user.update({ where: { id: user.id }, data: { isOnline: true } });
+            socket.broadcast.emit('user:online', { userId: user.id, isOnline: true });
         }
-        catch (error) {
-            console.error('Error marking messages read:', error);
-        }
-    });
-    socket.on('typing:start', (data) => {
-        const schema = z.object({ conversationId: z.string().min(1), receiverId: z.string().min(1) });
-        const parsed = schema.safeParse(data);
-        if (!parsed.success)
-            return;
-        io.to(`user:${parsed.data.receiverId}`).emit('user:typing', {
-            conversationId: parsed.data.conversationId,
-            userId: user.id,
-            isTyping: true,
+        socket.on('message:send', async (data) => {
+            const schema = z.object({
+                conversationId: z.string().min(1),
+                content: z.string().min(1).max(5000),
+            });
+            const parsed = schema.safeParse(data);
+            if (!parsed.success)
+                return socket.emit('message:error', { error: zodErrorToMessage(parsed.error) });
+            try {
+                const { conversationId, content } = parsed.data;
+                const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+                if (!conversation)
+                    return;
+                if (conversation.user1Id !== user.id && conversation.user2Id !== user.id)
+                    return;
+                const receiverId = conversation.user1Id === user.id ? conversation.user2Id : conversation.user1Id;
+                const message = await prisma.message.create({
+                    data: { content, senderId: user.id, receiverId, conversationId },
+                });
+                const isUser1Receiver = conversation.user1Id === receiverId;
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: {
+                        lastMessageAt: new Date(),
+                        [isUser1Receiver ? 'unreadCount1' : 'unreadCount2']: { increment: 1 },
+                    },
+                });
+                if (io) {
+                    io.to(`user:${receiverId}`).emit('message:new', message);
+                }
+                socket.emit('message:sent', message);
+            }
+            catch (error) {
+                console.error('Error sending message:', error);
+                socket.emit('message:error', { error: 'Failed to send message' });
+            }
+        });
+        socket.on('message:read', async (data) => {
+            const schema = z.object({ conversationId: z.string().min(1) });
+            const parsed = schema.safeParse(data);
+            if (!parsed.success)
+                return;
+            try {
+                const { conversationId } = parsed.data;
+                const conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
+                if (!conversation)
+                    return;
+                if (conversation.user1Id !== user.id && conversation.user2Id !== user.id)
+                    return;
+                await prisma.message.updateMany({
+                    where: { conversationId, receiverId: user.id, isRead: false },
+                    data: { isRead: true },
+                });
+                const isUser1 = conversation.user1Id === user.id;
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: { [isUser1 ? 'unreadCount1' : 'unreadCount2']: 0 },
+                });
+                const otherUserId = isUser1 ? conversation.user2Id : conversation.user1Id;
+                io.to(`user:${otherUserId}`).emit('message:read', {
+                    conversationId,
+                    readBy: user.id,
+                    readAt: new Date(),
+                });
+            }
+            catch (error) {
+                console.error('Error marking messages read:', error);
+            }
+        });
+        socket.on('typing:start', (data) => {
+            const schema = z.object({ conversationId: z.string().min(1), receiverId: z.string().min(1) });
+            const parsed = schema.safeParse(data);
+            if (!parsed.success)
+                return;
+            if (io) {
+                io.to(`user:${parsed.data.receiverId}`).emit('user:typing', {
+                    conversationId: parsed.data.conversationId,
+                    userId: user.id,
+                    isTyping: true,
+                });
+            }
+        });
+        socket.on('typing:stop', (data) => {
+            const schema = z.object({ conversationId: z.string().min(1), receiverId: z.string().min(1) });
+            const parsed = schema.safeParse(data);
+            if (!parsed.success)
+                return;
+            if (io) {
+                io.to(`user:${parsed.data.receiverId}`).emit('user:typing', {
+                    conversationId: parsed.data.conversationId,
+                    userId: user.id,
+                    isTyping: false,
+                });
+            }
+        });
+        socket.on('disconnect', async () => {
+            socketIdToUserId.delete(socket.id);
+            const sockets = userIdToSocketIds.get(user.id);
+            if (sockets) {
+                sockets.delete(socket.id);
+                if (sockets.size === 0)
+                    userIdToSocketIds.delete(user.id);
+            }
+            // No remaining connections -> mark offline
+            if (!userIdToSocketIds.has(user.id)) {
+                const lastSeen = new Date();
+                await prisma.user.update({ where: { id: user.id }, data: { isOnline: false, lastSeen } });
+                socket.broadcast.emit('user:offline', { userId: user.id, isOnline: false, lastSeen });
+            }
         });
     });
-    socket.on('typing:stop', (data) => {
-        const schema = z.object({ conversationId: z.string().min(1), receiverId: z.string().min(1) });
-        const parsed = schema.safeParse(data);
-        if (!parsed.success)
-            return;
-        io.to(`user:${parsed.data.receiverId}`).emit('user:typing', {
-            conversationId: parsed.data.conversationId,
-            userId: user.id,
-            isTyping: false,
-        });
-    });
-    socket.on('disconnect', async () => {
-        socketIdToUserId.delete(socket.id);
-        const sockets = userIdToSocketIds.get(user.id);
-        if (sockets) {
-            sockets.delete(socket.id);
-            if (sockets.size === 0)
-                userIdToSocketIds.delete(user.id);
-        }
-        // No remaining connections -> mark offline
-        if (!userIdToSocketIds.has(user.id)) {
-            const lastSeen = new Date();
-            await prisma.user.update({ where: { id: user.id }, data: { isOnline: false, lastSeen } });
-            socket.broadcast.emit('user:offline', { userId: user.id, isOnline: false, lastSeen });
-        }
-    });
-});
+}
 // ==================== START SERVER ====================
-const port = Number(env.PORT);
-httpServer.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`);
-});
+// Only start HTTP server if not on Vercel (Vercel handles routing)
+if (!isVercel && httpServer) {
+    const port = Number(env.PORT) || 3001;
+    httpServer.listen(port, () => {
+        console.log(`Server running on http://localhost:${port}`);
+    });
+}
+// Export Express app for Vercel serverless functions
+export default app;
 async function shutdown(signal) {
     console.log(`Received ${signal}, shutting down...`);
     try {
-        io.close();
-        httpServer.close();
+        io?.close(); // Use optional chaining
+        httpServer?.close(); // Use optional chaining
         await prisma.$disconnect();
     }
     finally {
