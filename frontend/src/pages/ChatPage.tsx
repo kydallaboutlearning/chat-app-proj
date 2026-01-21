@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import clsx from 'clsx'
 
 import { useNavigate } from 'react-router-dom'
@@ -52,6 +52,13 @@ export default function ChatPage() {
   const closeNewMessageModal = useUIStore((s) => s.closeNewMessageModal)
   const userSearch = useUIStore((s) => s.userSearch)
   const setUserSearch = useUIStore((s) => s.setUserSearch)
+  const conversationSearch = useUIStore((s) => s.conversationSearch)
+  const setConversationSearch = useUIStore((s) => s.setConversationSearch)
+  const showUnreadOnly = useUIStore((s) => s.showUnreadOnly)
+  const toggleUnreadFilter = useUIStore((s) => s.toggleUnreadFilter)
+  const showArchivedOnly = useUIStore((s) => s.showArchivedOnly)
+  const toggleArchivedFilter = useUIStore((s) => s.toggleArchivedFilter)
+  const showAll = useUIStore((s) => s.showAll)
 
   const contextMenu = useUIStore((s) => s.contextMenu)
   const openContextMenu = useUIStore((s) => s.openContextMenu)
@@ -104,21 +111,52 @@ export default function ChatPage() {
     return users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
   }, [users, userSearch])
 
+  // Filter conversations based on search and filters
+  const filteredConversations = useMemo(() => {
+    let filtered = [...conversations]
+    
+    // Apply archived filter
+    if (showArchivedOnly) {
+      filtered = filtered.filter((c) => c.isArchived)
+    } else if (showUnreadOnly) {
+      // Show unread only (non-archived)
+      filtered = filtered.filter((c) => !c.isArchived && c.unreadCount > 0)
+    } else if (showAll) {
+      // Show all non-archived by default
+      filtered = filtered.filter((c) => !c.isArchived)
+    }
+    
+    // Apply search filter
+    const searchQuery = conversationSearch.trim().toLowerCase()
+    if (searchQuery) {
+      filtered = filtered.filter((c) => {
+        const userName = c.otherUser.name.toLowerCase()
+        const userEmail = c.otherUser.email.toLowerCase()
+        const lastMessage = c.lastMessage?.content.toLowerCase() || ''
+        return userName.includes(searchQuery) || userEmail.includes(searchQuery) || lastMessage.includes(searchQuery)
+      })
+    }
+    
+    return filtered
+  }, [conversations, conversationSearch, showUnreadOnly, showArchivedOnly, showAll])
+
   const groupedMessages = useMemo(() => {
     if (!currentConversationId || !currentUser) return []
     const msgs = messagesByConv[currentConversationId] || []
     return groupMessages(msgs, currentUser.id)
   }, [messagesByConv, currentConversationId, currentUser])
 
-  // Fetch data on mount
+  // Fetch data on mount - only once
   useEffect(() => {
     if (!currentUser) {
       checkAuth().catch(() => handleLogout())
       return
     }
+    // Fetch data only once on mount
     fetchUsers()
     fetchConversations()
-  }, [fetchUsers, fetchConversations, currentUser, checkAuth])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser])
 
   // Socket.io real-time updates
   useEffect(() => {
@@ -218,9 +256,13 @@ export default function ChatPage() {
 
       const translateX = s.translateX
       const conv = conversations.find((c) => c.id === s.convId)
-      if (conv) {
-        if (translateX >= 50) markAsUnread(conv.id)
-        if (translateX <= -50) archiveConversation(conv.id)
+      if (conv && s.isSwiping) {
+        if (translateX >= 50) {
+          markAsUnread(conv.id)
+        }
+        if (translateX <= -50) {
+          archiveConversation(conv.id)
+        }
       }
 
       s.translateX = 0
@@ -244,20 +286,8 @@ export default function ChatPage() {
     }
   }, [archiveConversation, conversations, markAsUnread])
 
-  function handleContextMenu(e: React.MouseEvent, conversationId: string) {
-    e.preventDefault()
-    const x = e.clientX
-    const y = e.clientY
-    const vw = window.innerWidth
-    const vh = window.innerHeight
 
-    const adjustedX = x + CONTEXT_MENU_WIDTH > vw ? x - CONTEXT_MENU_WIDTH : x
-    const adjustedY = y + CONTEXT_MENU_ESTIMATED_HEIGHT > vh ? y - CONTEXT_MENU_ESTIMATED_HEIGHT : y
-
-    openContextMenu(adjustedX, adjustedY, conversationId)
-  }
-
-  function handleContextAction(action: string) {
+  const handleContextAction = useCallback((action: string) => {
     if (!contextMenu.isOpen || contextMenu.targetConversationId === null) return
     const conversationId = contextMenu.targetConversationId
 
@@ -287,14 +317,14 @@ export default function ChatPage() {
     }
 
     closeContextMenu()
-  }
+  }, [contextMenu, conversations, markAsUnread, archiveConversation, openContactInfo, deleteConversation, closeContextMenu])
 
-  function handleSelectConversation(conversationId: string) {
+  const handleSelectConversation = useCallback((conversationId: string) => {
     if (swipeRef.current.isSwiping) return
     selectConversation(conversationId)
-  }
+  }, [selectConversation])
 
-  async function onSend() {
+  const onSend = useCallback(async () => {
     if (!currentConversationId || !messageText.trim()) return
     try {
       await sendMessage(currentConversationId, messageText.trim())
@@ -302,7 +332,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Failed to send message:', error)
     }
-  }
+  }, [currentConversationId, messageText, sendMessage])
 
   // If auth is missing, show a friendly fallback instead of a blank screen
   if (!currentUser) {
@@ -351,67 +381,79 @@ export default function ChatPage() {
     <div className={appContainerClass}>
       {/* Left Icon Sidebar */}
       <aside className="icon-sidebar">
-        <div
-          className="logo"
-          id="logoMenuTrigger"
-          ref={logoRef}
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleUserDropdown()
-          }}
+        {/* Green Compose Button at Top */}
+        <button 
+          className="compose-button" 
+          type="button" 
+          onClick={openNewMessageModal}
+          title="New Message"
         >
-          <img
-            src="https://api.dicebear.com/7.x/shapes/svg?seed=logo&backgroundColor=10b981"
-            alt="Logo"
-            className="logo-icon"
-          />
-        </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+          </svg>
+        </button>
 
         <nav className="icon-nav">
-          <a href="#" className="nav-icon-item">
+          {/* Home Icon */}
+          <a href="#" className="nav-icon-item" title="Home">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
               <polyline points="9 22 9 12 15 12 15 22"></polyline>
             </svg>
           </a>
-          <a href="#" className="nav-icon-item active">
+          {/* Chat Icon - Active */}
+          <a href="#" className="nav-icon-item active" title="Messages">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
           </a>
-          <a href="#" className="nav-icon-item">
+          {/* Explore/Compass Icon */}
+          <a href="#" className="nav-icon-item" title="Explore">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="2" y1="12" x2="22" y2="12"></line>
               <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>
           </a>
-          <a href="#" className="nav-icon-item">
+          {/* Archive/Folder Icon */}
+          <a href="#" className="nav-icon-item" title="Archive">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="21 8 21 21 3 21 3 8"></polyline>
+              <rect x="1" y="3" width="22" height="5"></rect>
+              <line x1="10" y1="12" x2="14" y2="12"></line>
+            </svg>
+          </a>
+          {/* Media/Gallery Icon */}
+          <a href="#" className="nav-icon-item" title="Media">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
               <line x1="8" y1="21" x2="16" y2="21"></line>
               <line x1="12" y1="17" x2="12" y2="21"></line>
             </svg>
           </a>
-          <a href="#" className="nav-icon-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-          </a>
         </nav>
 
         <div className="sidebar-bottom">
-          <button className="ai-button" title="AI Assistant" type="button">
+          {/* Settings Icon */}
+          <button className="settings-button" title="Settings" type="button">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
             </svg>
           </button>
-          <div className="user-avatar-small">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=testing2" alt="User" />
+          {/* User Avatar */}
+          <div 
+            className="user-avatar-small"
+            ref={logoRef}
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleUserDropdown()
+            }}
+          >
+            {currentUser?.picture ? (
+              <img src={currentUser.picture} alt={currentUser.name} />
+            ) : (
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.email || 'user'}`} alt="User" />
+            )}
           </div>
         </div>
       </aside>
@@ -499,17 +541,70 @@ export default function ChatPage() {
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
-            <input type="text" placeholder="Search" className="search-input" />
+            <input 
+              type="text" 
+              placeholder="Search in message" 
+              className="search-input" 
+              value={conversationSearch}
+              onChange={(e) => setConversationSearch(e.target.value)}
+            />
           </div>
-          <button className="filter-btn" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-            </svg>
-          </button>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button 
+              className={clsx('filter-btn', showUnreadOnly && 'active')} 
+              type="button"
+              onClick={toggleUnreadFilter}
+              title={showUnreadOnly ? 'Show all messages' : 'Show unread only'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </button>
+            <button 
+              className={clsx('filter-btn', showArchivedOnly && 'active')} 
+              type="button"
+              onClick={toggleArchivedFilter}
+              title={showArchivedOnly ? 'Show all messages' : 'Show archived only'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                <rect x="1" y="3" width="22" height="5"></rect>
+                <line x1="10" y1="12" x2="14" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Pills */}
+        <div style={{ padding: '8px 16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {showUnreadOnly && (
+            <button 
+              className="unread-filter-pill"
+              onClick={toggleUnreadFilter}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span>Unread</span>
+            </button>
+          )}
+          {showArchivedOnly && (
+            <button 
+              className="archive-filter-pill"
+              onClick={toggleArchivedFilter}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                <rect x="1" y="3" width="22" height="5"></rect>
+                <line x1="10" y1="12" x2="14" y2="12"></line>
+              </svg>
+              <span>Archived</span>
+            </button>
+          )}
         </div>
 
         <div className="conversation-list" id="conversationList">
-          {conversations.filter((c) => !c.isArchived).map((conv) => {
+          {filteredConversations.map((conv) => {
             const user = conv.otherUser
             const active = conv.id === currentConversationId
             const isSwipingThis = swipeRef.current.convId === conv.id
@@ -519,23 +614,37 @@ export default function ChatPage() {
 
             return (
               <div className="conversation-item-wrapper" data-conv-id={conv.id} key={conv.id}>
-                <div className={clsx('swipe-action left', showLeft && 'visible')}>
+                <div 
+                  className={clsx('swipe-action left', showLeft && 'visible')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    markAsUnread(conv.id)
+                  }}
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                   </svg>
                   Unread
                 </div>
-                <div className={clsx('swipe-action right', showRight && 'visible')}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="21 8 21 21 3 21 3 8"></polyline>
-                    <rect x="1" y="3" width="22" height="5"></rect>
-                    <line x1="10" y1="12" x2="14" y2="12"></line>
-                  </svg>
-                  Archive
+                <div 
+                  className={clsx('swipe-action right archive-action', showRight && 'visible')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    archiveConversation(conv.id)
+                  }}
+                >
+                  <div className="archive-button-content">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                      <rect x="1" y="3" width="22" height="5"></rect>
+                      <line x1="10" y1="12" x2="14" y2="12"></line>
+                    </svg>
+                    <span>Archive</span>
+                  </div>
                 </div>
 
                 <div
-                  className={clsx('conversation-item', active && 'active', conv.unreadCount > 0 && 'unread', isSwipingThis && 'swiping')}
+                  className={clsx('conversation-item', active && 'active', conv.unreadCount > 0 && 'unread', conv.isArchived && 'archived', isSwipingThis && 'swiping')}
                   style={{ transform: translateX ? `translateX(${translateX}px)` : undefined }}
                   onPointerDown={(e) => {
                     swipeRef.current.convId = conv.id
@@ -543,32 +652,53 @@ export default function ChatPage() {
                     swipeRef.current.translateX = 0
                     swipeRef.current.isSwiping = false
                   }}
-                  onClick={() => handleSelectConversation(conv.id)}
+                  onClick={() => {
+                    if (!swipeRef.current.isSwiping) {
+                      handleSelectConversation(conv.id)
+                    }
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault()
-                    openContextMenu(e.clientX, e.clientY, conv.id)
+                    const x = e.clientX
+                    const y = e.clientY
+                    const vw = window.innerWidth
+                    const vh = window.innerHeight
+                    const adjustedX = x + CONTEXT_MENU_WIDTH > vw ? x - CONTEXT_MENU_WIDTH : x
+                    const adjustedY = y + CONTEXT_MENU_ESTIMATED_HEIGHT > vh ? y - CONTEXT_MENU_ESTIMATED_HEIGHT : y
+                    openContextMenu(adjustedX, adjustedY, conv.id)
                   }}
                 >
-                  {conv.unreadCount > 0 ? (
-                    <div className="unread-badge">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                      </svg>
-                      <span>Unread</span>
-                    </div>
-                  ) : (
-                    <div className="conversation-avatar">
-                      <img src={getUserAvatarUrl(user)} alt={user.name} />
-                      {user.isOnline ? <span className="online-dot"></span> : null}
-                    </div>
-                  )}
+                  <div className="conversation-avatar">
+                    <img src={getUserAvatarUrl(user)} alt={user.name} />
+                    {user.isOnline ? <span className="online-dot"></span> : null}
+                    {conv.unreadCount > 0 && (
+                      <div className="unread-pill-badge">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Unread</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="conversation-content">
                     <div className="conversation-top">
                       <span className="conversation-name">{user.name}</span>
-                      <span className="conversation-time">
-                        {conv.lastMessage ? formatConversationTime(conv.lastMessage.createdAt) : formatConversationTime(conv.updatedAt)}
-                      </span>
+                      <div className="conversation-badges">
+                        {conv.isArchived && (
+                          <span className="archive-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                              <rect x="1" y="3" width="22" height="5"></rect>
+                              <line x1="10" y1="12" x2="14" y2="12"></line>
+                            </svg>
+                            <span>Archive</span>
+                          </span>
+                        )}
+                        <span className="conversation-time">
+                          {conv.lastMessage ? formatConversationTime(conv.lastMessage.createdAt) : formatConversationTime(conv.updatedAt)}
+                        </span>
+                      </div>
                     </div>
                     <div className="conversation-bottom">
                       <span className="conversation-preview">{conv.lastMessage?.content || 'Start a conversation...'}</span>
@@ -762,7 +892,6 @@ export default function ChatPage() {
           )}
           {groupedMessages.map((msg) => {
             const groupClass = msg.isMe ? 'sent' : 'received'
-            const lastIndex = msg.messages.length - 1
             return (
               <div className={clsx('message-group', groupClass)} key={msg.id}>
                 {msg.messages.map((text, index) => (

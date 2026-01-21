@@ -129,17 +129,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   markAsUnread: async (conversationId: string) => {
     try {
       await api.patch(`/api/conversations/${conversationId}`, { markAsUnread: true })
-      await get().fetchConversations()
+      // Optimistically update local state
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conversationId ? { ...c, unreadCount: (c.unreadCount || 0) + 1 } : c
+        ),
+      }))
     } catch (error: any) {
       console.error('Failed to mark as unread:', error)
+      // Revert on error
+      await get().fetchConversations()
     }
   },
 
   markAsRead: async (conversationId: string) => {
     try {
       await api.patch(`/api/conversations/${conversationId}`, { markAsRead: true })
-      // Update local state
+      // Update local state optimistically
       set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conversationId ? { ...c, unreadCount: 0 } : c
+        ),
         messages: {
           ...state.messages,
           [conversationId]: (state.messages[conversationId] || []).map((m) => ({
@@ -148,18 +158,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
           })),
         },
       }))
-      await get().fetchConversations()
     } catch (error: any) {
       console.error('Failed to mark as read:', error)
+      // Revert on error
+      await get().fetchConversations()
     }
   },
 
   archiveConversation: async (conversationId: string) => {
     try {
       await api.patch(`/api/conversations/${conversationId}`, { isArchived: true })
-      await get().fetchConversations()
+      // Optimistically update local state instead of refetching
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conversationId ? { ...c, isArchived: true } : c
+        ),
+      }))
     } catch (error: any) {
       console.error('Failed to archive conversation:', error)
+      // Revert on error
+      await get().fetchConversations()
     }
   },
 

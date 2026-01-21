@@ -10,6 +10,10 @@ type UIState = {
   isUserDropdownOpen: boolean
   isNewMessageModalOpen: boolean
   userSearch: string
+  conversationSearch: string
+  showUnreadOnly: boolean
+  showArchivedOnly: boolean
+  showAll: boolean
 
   contextMenu: ContextMenuState
 
@@ -24,6 +28,10 @@ type UIState = {
   openNewMessageModal: () => void
   closeNewMessageModal: () => void
   setUserSearch: (value: string) => void
+  setConversationSearch: (value: string) => void
+  toggleUnreadFilter: () => void
+  toggleArchivedFilter: () => void
+  setShowAll: () => void
 
   openContextMenu: (x: number, y: number, targetConversationId: string) => void
   closeContextMenu: () => void
@@ -39,6 +47,10 @@ export const useUIStore = create<UIState>((set) => ({
   isUserDropdownOpen: false,
   isNewMessageModalOpen: false,
   userSearch: '',
+  conversationSearch: '',
+  showUnreadOnly: false,
+  showArchivedOnly: false,
+  showAll: true,
 
   contextMenu: { isOpen: false, x: 0, y: 0, targetConversationId: null },
 
@@ -53,6 +65,18 @@ export const useUIStore = create<UIState>((set) => ({
   openNewMessageModal: () => set({ isNewMessageModalOpen: true, userSearch: '' }),
   closeNewMessageModal: () => set({ isNewMessageModalOpen: false }),
   setUserSearch: (value) => set({ userSearch: value }),
+  setConversationSearch: (value) => set({ conversationSearch: value }),
+  toggleUnreadFilter: () => set((s) => ({ 
+    showUnreadOnly: !s.showUnreadOnly,
+    showArchivedOnly: false,
+    showAll: false 
+  })),
+  toggleArchivedFilter: () => set((s) => ({ 
+    showArchivedOnly: !s.showArchivedOnly,
+    showUnreadOnly: false,
+    showAll: false 
+  })),
+  setShowAll: () => set({ showUnreadOnly: false, showArchivedOnly: false, showAll: true }),
 
   openContextMenu: (x, y, targetConversationId) =>
     set({
