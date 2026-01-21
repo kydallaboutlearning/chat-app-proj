@@ -606,6 +606,7 @@ html, body {
 }
 
 .conversation-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -613,6 +614,7 @@ html, body {
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.2s;
+  overflow: visible;
 }
 
 .conversation-item:hover {
@@ -670,27 +672,26 @@ html, body {
   gap: 6px;
 }
 
-.archive-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  background: rgba(16, 185, 129, 0.1);
+.archive-tag {
+  display: inline-block;
+  background: rgba(16, 185, 129, 0.15);
   color: var(--primary-green);
-  border-radius: 12px;
+  padding: 3px 10px;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.archive-badge svg {
-  width: 12px;
-  height: 12px;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
 }
 
 .conversation-item.archived {
   opacity: 0.7;
+}
+
+.conversation-content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .conversation-name {
@@ -1107,10 +1108,18 @@ html, body {
   border-radius: 50%;
   cursor: pointer;
   transition: background 0.2s;
+  flex-shrink: 0;
 }
 
-.send-btn:hover {
+.send-btn:hover:not(:disabled) {
   background: var(--primary-green-hover);
+  transform: scale(1.05);
+}
+
+.send-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* Scrollbar Styles */
@@ -1132,36 +1141,21 @@ html, body {
 }
 
 /* Unread Badge */
-/* Unread Pill Badge - Curved edges, positioned on avatar */
-.unread-pill-badge {
+/* UNREAD Tag - Green rectangular tag on chat item */
+.unread-tag {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  top: 0;
+  left: 0;
   background: var(--primary-green);
   color: white;
-  border-radius: 12px;
-  font-size: 10px;
-  font-weight: 600;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+  letter-spacing: 0.5px;
+  border-radius: 4px 0 4px 0;
   z-index: 2;
-  white-space: nowrap;
-}
-
-.unread-pill-badge svg {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-}
-
-.unread-pill-badge span {
-  font-size: 10px;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .conversation-item.unread .conversation-name {

@@ -59,6 +59,13 @@ export default function ChatPage() {
   const showArchivedOnly = useUIStore((s) => s.showArchivedOnly)
   const toggleArchivedFilter = useUIStore((s) => s.toggleArchivedFilter)
   const showAll = useUIStore((s) => s.showAll)
+  const globalSearchOpen = useUIStore((s) => s.globalSearchOpen)
+  const setGlobalSearchOpen = useUIStore((s) => s.setGlobalSearchOpen)
+  const chatSearchOpen = useUIStore((s) => s.chatSearchOpen)
+  const setChatSearchOpen = useUIStore((s) => s.setChatSearchOpen)
+  
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('')
+  const [chatSearchQuery, setChatSearchQuery] = useState('')
 
   const contextMenu = useUIStore((s) => s.contextMenu)
   const openContextMenu = useUIStore((s) => s.openContextMenu)
@@ -207,14 +214,23 @@ export default function ChatPage() {
     return () => document.removeEventListener('click', onDocClick)
   }, [closeContextMenu, closeUserDropdown, contextMenu.isOpen, isUserDropdownOpen])
 
-  // Close overlays on Escape
+  // Close overlays on Escape and handle keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') closeAllOverlays()
+      if (e.key === 'Escape') {
+        closeAllOverlays()
+        setGlobalSearchOpen(false)
+        setChatSearchOpen(false)
+      }
+      // Cmd+K or Ctrl+K for global search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setGlobalSearchOpen(true)
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [closeAllOverlays])
+  }, [closeAllOverlays, setGlobalSearchOpen, setChatSearchOpen])
 
   // Focus search input when modal opens
   useEffect(() => {
@@ -326,11 +342,15 @@ export default function ChatPage() {
 
   const onSend = useCallback(async () => {
     if (!currentConversationId || !messageText.trim()) return
+    const textToSend = messageText.trim()
+    // Clear input immediately for better UX
+    setMessageText('')
     try {
-      await sendMessage(currentConversationId, messageText.trim())
-      setMessageText('')
+      await sendMessage(currentConversationId, textToSend)
     } catch (error) {
       console.error('Failed to send message:', error)
+      // Restore text on error
+      setMessageText(textToSend)
     }
   }, [currentConversationId, messageText, sendMessage])
 
@@ -671,28 +691,21 @@ export default function ChatPage() {
                   <div className="conversation-avatar">
                     <img src={getUserAvatarUrl(user)} alt={user.name} />
                     {user.isOnline ? <span className="online-dot"></span> : null}
-                    {conv.unreadCount > 0 && (
-                      <div className="unread-pill-badge">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                        <span>Unread</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="conversation-content">
+                    {/* UNREAD Tag - Green rectangular tag on top */}
+                    {conv.unreadCount > 0 && (
+                      <div className="unread-tag">
+                        <span>UNREAD</span>
+                      </div>
+                    )}
                     <div className="conversation-top">
                       <span className="conversation-name">{user.name}</span>
                       <div className="conversation-badges">
                         {conv.isArchived && (
-                          <span className="archive-badge">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <polyline points="21 8 21 21 3 21 3 8"></polyline>
-                              <rect x="1" y="3" width="22" height="5"></rect>
-                              <line x1="10" y1="12" x2="14" y2="12"></line>
-                            </svg>
-                            <span>Archive</span>
+                          <span className="archive-tag">
+                            <span>ARCHIVED</span>
                           </span>
                         )}
                         <span className="conversation-time">
@@ -857,24 +870,48 @@ export default function ChatPage() {
             )}
           </div>
           <div className="chat-header-actions">
-            <button className="header-action-btn" type="button">
+            <button 
+              className="header-action-btn" 
+              type="button"
+              onClick={() => setChatSearchOpen(!chatSearchOpen)}
+              title="Search in conversation"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
             </button>
-            <button className="header-action-btn" type="button">
+            <button 
+              className="header-action-btn" 
+              type="button"
+              onClick={() => alert('Audio call feature coming soon!')}
+              title="Audio call"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
               </svg>
             </button>
-            <button className="header-action-btn" type="button">
+            <button 
+              className="header-action-btn" 
+              type="button"
+              onClick={() => alert('Video call feature coming soon!')}
+              title="Video call"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="23 7 16 12 23 17 23 7"></polygon>
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
               </svg>
             </button>
-            <button className="header-action-btn" type="button">
+            <button 
+              className="header-action-btn" 
+              type="button"
+              onClick={() => {
+                if (currentChatUser) {
+                  openContactInfo(currentChatUser.id)
+                }
+              }}
+              title="More options"
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="1"></circle>
                 <circle cx="19" cy="12" r="1"></circle>
@@ -928,6 +965,39 @@ export default function ChatPage() {
           )}
         </div>
 
+        {/* Chat Search Bar */}
+        {chatSearchOpen && (
+          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border-color)' }}>
+            <div className="search-input-wrapper" style={{ margin: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                placeholder="Search in conversation..."
+                className="search-input"
+                value={chatSearchQuery}
+                onChange={(e) => setChatSearchQuery(e.target.value)}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setChatSearchOpen(false)
+                  setChatSearchQuery('')
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="chat-input-container">
           <div className="chat-input-wrapper">
             <input
@@ -938,14 +1008,19 @@ export default function ChatPage() {
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   onSend()
                 }
               }}
             />
             <div className="chat-input-actions">
-              <button className="input-action-btn" type="button">
+              <button 
+                className="input-action-btn" 
+                type="button"
+                onClick={() => alert('Voice message feature coming soon!')}
+                title="Voice message"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -953,7 +1028,12 @@ export default function ChatPage() {
                   <line x1="8" y1="23" x2="16" y2="23"></line>
                 </svg>
               </button>
-              <button className="input-action-btn" type="button">
+              <button 
+                className="input-action-btn" 
+                type="button"
+                onClick={() => alert('Emoji picker coming soon!')}
+                title="Emoji"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"></circle>
                   <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
@@ -961,13 +1041,24 @@ export default function ChatPage() {
                   <line x1="15" y1="9" x2="15.01" y2="9"></line>
                 </svg>
               </button>
-              <button className="input-action-btn" type="button">
+              <button 
+                className="input-action-btn" 
+                type="button"
+                onClick={() => alert('Attachment feature coming soon!')}
+                title="Attach file"
+              >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                 </svg>
               </button>
             </div>
-            <button className="send-btn" id="sendBtn" type="button" onClick={onSend}>
+            <button 
+              className="send-btn" 
+              id="sendBtn" 
+              type="button" 
+              onClick={onSend}
+              disabled={!messageText.trim()}
+            >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
@@ -1293,7 +1384,17 @@ export default function ChatPage() {
           </div>
         </div>
         <div className="header-right">
-          <div className="header-search">
+          <div 
+            className="header-search" 
+            onClick={() => setGlobalSearchOpen(true)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setGlobalSearchOpen(true)
+              }
+            }}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"></circle>
               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1301,26 +1402,128 @@ export default function ChatPage() {
             <span>Search</span>
             <span className="shortcut">⌘+K</span>
           </div>
-          <button className="header-icon-btn" type="button">
+          <button 
+            className="header-icon-btn" 
+            type="button"
+            onClick={() => alert('Notifications feature coming soon!')}
+            title="Notifications"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
             </svg>
           </button>
-          <button className="header-icon-btn" type="button">
+          <button 
+            className="header-icon-btn" 
+            type="button"
+            onClick={() => alert('Settings feature coming soon!')}
+            title="Settings"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </button>
-          <div className="header-user">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=testing2" alt="User" />
+          <div 
+            className="header-user"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleUserDropdown()
+            }}
+            role="button"
+            tabIndex={0}
+            style={{ cursor: 'pointer' }}
+          >
+            {currentUser?.picture ? (
+              <img src={currentUser.picture} alt={currentUser.name} />
+            ) : (
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.email || 'user'}`} alt="User" />
+            )}
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
           </div>
         </div>
       </header>
+
+      {/* Global Search Modal */}
+      {globalSearchOpen && (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 1000 }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              setGlobalSearchOpen(false)
+              setGlobalSearchQuery('')
+            }
+          }}
+        >
+          <div className="new-message-modal" style={{ maxWidth: '600px', marginTop: '10vh' }}>
+            <h3>Search</h3>
+            <div className="modal-search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                placeholder="Search conversations, messages, or users..."
+                className="search-input"
+                value={globalSearchQuery}
+                onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setGlobalSearchOpen(false)
+                  setGlobalSearchQuery('')
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            {globalSearchQuery && (
+              <div className="user-list" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {filteredConversations
+                  .filter((c) => {
+                    const query = globalSearchQuery.toLowerCase()
+                    return (
+                      c.otherUser.name.toLowerCase().includes(query) ||
+                      c.otherUser.email.toLowerCase().includes(query) ||
+                      c.lastMessage?.content.toLowerCase().includes(query)
+                    )
+                  })
+                  .map((conv) => (
+                    <div
+                      key={conv.id}
+                      className="user-list-item"
+                      onClick={() => {
+                        handleSelectConversation(conv.id)
+                        setGlobalSearchOpen(false)
+                        setGlobalSearchQuery('')
+                      }}
+                    >
+                      <img src={getUserAvatarUrl(conv.otherUser)} alt={conv.otherUser.name} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 500 }}>{conv.otherUser.name}</div>
+                        {conv.lastMessage && (
+                          <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                            {conv.lastMessage.content}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

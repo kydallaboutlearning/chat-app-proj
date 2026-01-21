@@ -14,6 +14,8 @@ type UIState = {
   showUnreadOnly: boolean
   showArchivedOnly: boolean
   showAll: boolean
+  globalSearchOpen: boolean
+  chatSearchOpen: boolean
 
   contextMenu: ContextMenuState
 
@@ -32,6 +34,8 @@ type UIState = {
   toggleUnreadFilter: () => void
   toggleArchivedFilter: () => void
   setShowAll: () => void
+  setGlobalSearchOpen: (open: boolean) => void
+  setChatSearchOpen: (open: boolean) => void
 
   openContextMenu: (x: number, y: number, targetConversationId: string) => void
   closeContextMenu: () => void
@@ -51,6 +55,8 @@ export const useUIStore = create<UIState>((set) => ({
   showUnreadOnly: false,
   showArchivedOnly: false,
   showAll: true,
+  globalSearchOpen: false,
+  chatSearchOpen: false,
 
   contextMenu: { isOpen: false, x: 0, y: 0, targetConversationId: null },
 
@@ -77,6 +83,8 @@ export const useUIStore = create<UIState>((set) => ({
     showAll: false 
   })),
   setShowAll: () => set({ showUnreadOnly: false, showArchivedOnly: false, showAll: true }),
+  setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
+  setChatSearchOpen: (open) => set({ chatSearchOpen: open }),
 
   openContextMenu: (x, y, targetConversationId) =>
     set({
