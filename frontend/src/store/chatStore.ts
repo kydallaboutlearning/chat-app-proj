@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 import { api } from '../services/api'
 import type { Conversation, Message, User } from '../types'
-import { useAuthStore } from './authStore'
+// import { useAuthStore } from './authStore'
 
 type ChatState = {
   users: User[]
