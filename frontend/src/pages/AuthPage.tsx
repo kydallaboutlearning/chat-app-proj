@@ -185,6 +185,7 @@ export default function AuthPage() {
                   text={isLogin ? 'signin_with' : 'signup_with'}
                 />
               ) : (
+                
                 <button className="submit-btn" type="button" onClick={() => null}>
                   Set VITE_GOOGLE_CLIENT_ID to enable Google Sign-In
                 </button>
