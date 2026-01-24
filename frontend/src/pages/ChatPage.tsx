@@ -496,8 +496,8 @@ export default function ChatPage() {
         <div className="dropdown-divider"></div>
 
         <div className="dropdown-user-info">
-          <div className="dropdown-user-name">testing2</div>
-          <div className="dropdown-user-email">testing2@gmail.com</div>
+          <div className="dropdown-user-name">{currentUser?.name}</div>
+          <div className="dropdown-user-email">{currentUser?.email}</div>
         </div>
 
         <div className="dropdown-credits">

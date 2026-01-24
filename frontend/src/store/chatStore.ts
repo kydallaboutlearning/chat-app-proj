@@ -41,6 +41,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const res = await api.get('/api/users')
       if (res.data.success) {
+        console.log(res.data.users)
         set({ users: res.data.users })
       }
     } catch (error: any) {
