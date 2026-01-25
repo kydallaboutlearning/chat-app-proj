@@ -504,7 +504,10 @@ export default function ChatPage() {
         <button
           className="compose-button"
           type="button"
-          onClick={openNewMessageModal}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleUserDropdown();
+          }}
           title="New Message"
         >
           <svg
@@ -625,14 +628,7 @@ export default function ChatPage() {
             </svg>
           </button>
           {/* User Avatar */}
-          <div
-            className="user-avatar-small"
-            ref={logoRef}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleUserDropdown();
-            }}
-          >
+          <div className="user-avatar-small" ref={logoRef}>
             {currentUser?.picture ? (
               <img src={currentUser.picture} alt={currentUser.name} />
             ) : (
@@ -706,29 +702,59 @@ export default function ChatPage() {
 
         <a href="#" className="dropdown-item">
           <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
             fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            <rect width="28" height="28" rx="6" fill="#F3F3EE" />
+            <g clip-path="url(#clip0_0_2037)">
+              <path
+                d="M8.66683 13.3333H19.3335M8.66683 13.3333C7.93045 13.3333 7.3335 12.7364 7.3335 12V11.3333C7.3335 10.5969 7.93045 9.99999 8.66683 9.99999H19.3335C20.0699 9.99999 20.6668 10.5969 20.6668 11.3333V12C20.6668 12.7364 20.0699 13.3333 19.3335 13.3333M8.66683 13.3333L8.66683 19.3333C8.66683 20.0697 9.26378 20.6667 10.0002 20.6667H18.0002C18.7365 20.6667 19.3335 20.0697 19.3335 19.3333V13.3333M14.0002 9.99999H16.6668C17.4032 9.99999 18.0002 9.40304 18.0002 8.66666C18.0002 7.93028 17.4032 7.33333 16.6668 7.33333C15.1941 7.33333 14.0002 8.52724 14.0002 9.99999ZM14.0002 9.99999H11.3335C10.5971 9.99999 10.0002 9.40304 10.0002 8.66666C10.0002 7.93028 10.5971 7.33333 11.3335 7.33333C12.8063 7.33333 14.0002 8.52724 14.0002 9.99999ZM14.0002 9.99999V20.6667"
+                stroke="#28303F"
+                stroke-linecap="round"
+              />
+            </g>
+            <defs>
+              <clipPath id="clip0_0_2037">
+                <rect
+                  width="16"
+                  height="16"
+                  fill="white"
+                  transform="translate(6 6)"
+                />
+              </clipPath>
+            </defs>
           </svg>
           Win free credits
         </a>
         <a href="#" className="dropdown-item">
           <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
             fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <rect width="28" height="28" rx="6" fill="#F3F3EE" />
+            <g clip-path="url(#clip0_0_2043)">
+              <path
+                d="M14.0002 7.33334V8M14.0002 20V20.6667M18.7142 9.28596L18.2428 9.75737M9.75753 18.2426L9.28612 18.714M20.6668 14H20.0002M8.00016 14H7.3335M18.7142 18.714L18.2428 18.2426M9.75753 9.75737L9.28612 9.28596M18.0002 14C18.0002 16.2091 16.2093 18 14.0002 18C11.791 18 10.0002 16.2091 10.0002 14C10.0002 11.7909 11.791 10 14.0002 10C16.2093 10 18.0002 11.7909 18.0002 14Z"
+                stroke="#28303F"
+                stroke-linecap="round"
+              />
+            </g>
+            <defs>
+              <clipPath id="clip0_0_2043">
+                <rect
+                  width="16"
+                  height="16"
+                  fill="white"
+                  transform="translate(6 6)"
+                />
+              </clipPath>
+            </defs>
           </svg>
           Theme Style
         </a>
@@ -741,16 +767,24 @@ export default function ChatPage() {
           }}
         >
           <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
+            width="28"
+            height="28"
+            viewBox="0 0 28 28"
             fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+            xmlns="http://www.w3.org/2000/svg"
           >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-            <polyline points="16 17 21 12 16 7"></polyline>
-            <line x1="21" y1="12" x2="9" y2="12"></line>
+            <rect width="28" height="28" rx="6" fill="#F3F3EE" />
+            <path
+              d="M19.3335 15.3333L20.1954 14.4714C20.4558 14.2111 20.4558 13.7889 20.1954 13.5286L19.3335 12.6667"
+              stroke="#28303F"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M20.0002 14H14.6668M10.0002 19.3333C8.5274 19.3333 7.3335 18.1394 7.3335 16.6667V11.3333C7.3335 9.86058 8.5274 8.66667 10.0002 8.66667M10.0002 19.3333C11.4729 19.3333 12.6668 18.1394 12.6668 16.6667V11.3333C12.6668 9.86058 11.4729 8.66667 10.0002 8.66667M10.0002 19.3333H15.3335C16.8063 19.3333 18.0002 18.1394 18.0002 16.6667M10.0002 8.66667H15.3335C16.8063 8.66667 18.0002 9.86058 18.0002 11.3333"
+              stroke="#28303F"
+              stroke-linecap="round"
+            />
           </svg>
           Log out
         </a>
@@ -1121,6 +1155,7 @@ export default function ChatPage() {
           data-action="mute"
           onClick={() => handleContextAction("mute")}
         >
+          <div className="context-menu-subitem">
           <svg
             width="16"
             height="16"
@@ -1137,6 +1172,7 @@ export default function ChatPage() {
             />
           </svg>
           Mute
+          </div>
           <svg
             width="16"
             height="16"
@@ -1524,7 +1560,6 @@ export default function ChatPage() {
                   </div>
                 ))}
                 <div className="message-time">
-                  {msg.time}
                   {msg.isMe && msg.read ? (
                     <span className="read-status">
                       <svg
@@ -1546,6 +1581,7 @@ export default function ChatPage() {
                       </svg>
                     </span>
                   ) : null}
+                  {msg.time}
                 </div>
               </div>
             );
@@ -2248,10 +2284,6 @@ export default function ChatPage() {
           </button>
           <div
             className="header-user"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleUserDropdown();
-            }}
             role="button"
             tabIndex={0}
             style={{ cursor: "pointer" }}
